@@ -1,127 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Prediction</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            font-family: Arial, sans-serif;
-        }
-        video {
-            max-width: 90%;
-            border-radius: 15px; /* Rounded corners */
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        button {
-            margin: 20px 0;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background-color: #007bff;
-            color: white;
-        }
-        p {
-            font-size: 18px;
-            color: #333;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Prediction</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    video {
+      max-width: 90%;
+      border-radius: 15px; /* Rounded corners */
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    button {
+      margin: 20px 0;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: white;
+    }
+    p {
+      font-size: 18px;
+      color: #333;
+    }
+  </style>
 </head>
 <body>
 
-<h2>DOG OR CAT???</h2>
+<h2>Which model is your mobile phone???</h2>
 
 <video id="video" autoplay playsinline></video>
 <!--<button onclick="switchCamera()">Switch Camera</button>-->
 <p id="result"></p>
 
 <script>
-    ////////////////////////////////
-    ////////    SPECIFY PARAMETERS
-    ////////////////////////////////
-    const PROCESSING_SPEED = 2000;
-    const CLASSES = ["cat", "dog"];
-    const MODEL_FOLDER = 'model/model.json';
-    // const mode = 'environment' // back camera
-    const camera_mode = 'user' // front camera
+  ////////////////////////////////
+  ////////    SPECIFY PARAMETERS
+  ////////////////////////////////
+  const PROCESSING_SPEED = 2000;
+  const CLASSES = ["cat", "dog"];
+  const MODEL_FOLDER = 'model/model.json';
+  // const mode = 'environment' // back camera
+  const camera_mode = 'user' // front camera
 
-    let currentStream;
+  let currentStream;
 
-    ////////////////////////////////
-    ////////    USE THIS FUNCTION FOR INTERACTIONS
-    ////////////////////////////////
-    function interaction(predictedClass, classScores) {
-        console.log(classScores);
-        document.getElementById("result").innerHTML = `Prediction: ${predictedClass}, Confidence: ${classScores[0]}`;
-        document.body.style.backgroundColor = predictedClass === "dog" ? "red" : "white";
+  ////////////////////////////////
+  ////////    USE THIS FUNCTION FOR INTERACTIONS
+  ////////////////////////////////
+  function interaction(predictedClass, classScores) {
+    console.log(classScores);
+    document.getElementById("result").innerHTML = `Prediction: ${predictedClass}, Confidence: ${classScores[0]}`;
+    document.body.style.backgroundColor = predictedClass === "dog" ? "red" : "white";
+  }
+
+  ////////////////////////////////
+  ////////    VIDEO CAPTURE AND PREDICTION LOGIC
+  ////////////////////////////////
+  async function startVideo(facingMode = 'user') {
+    // Stop any existing video tracks to free up the camera
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => {
+        track.stop();
+      });
     }
 
-    ////////////////////////////////
-    ////////    VIDEO CAPTURE AND PREDICTION LOGIC
-    ////////////////////////////////
-    async function startVideo(facingMode = 'user') {
-        // Stop any existing video tracks to free up the camera
-        if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-                track.stop();
-            });
-        }
+    try {
+      // Request access to the camera with the specified facing mode
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode }
+      });
 
-        try {
-            // Request access to the camera with the specified facing mode
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode }
-            });
+      const videoElement = document.getElementById('video');
+      videoElement.srcObject = stream;
+      currentStream = stream;
 
-            const videoElement = document.getElementById('video');
-            videoElement.srcObject = stream;
-            currentStream = stream;
-
-            // Return a promise that resolves when the video is ready to play
-            return new Promise(resolve => {
-                videoElement.onloadedmetadata = () => {
-                    resolve(videoElement);
-                };
-            });
-        } catch (err) {
-            console.error('Error accessing the camera:', err);
-        }
+      // Return a promise that resolves when the video is ready to play
+      return new Promise(resolve => {
+        videoElement.onloadedmetadata = () => {
+          resolve(videoElement);
+        };
+      });
+    } catch (err) {
+      console.error('Error accessing the camera:', err);
     }
+  }
 
 
-    async function startPredicting() {
-        const model = await tf.loadGraphModel(MODEL_FOLDER);
-        setInterval(async () => {
-            const example = tf.browser.fromPixels(video).cast('float32');
-            const prediction = await model.predict(example.expandDims());
-            const classScores = await prediction.data();
-            const maxScoreId = classScores.indexOf(Math.max(...classScores));
-            const predictedClass = CLASSES[maxScoreId];
+  async function startPredicting() {
+    const model = await tf.loadGraphModel(MODEL_FOLDER);
+    setInterval(async () => {
+      const example = tf.browser.fromPixels(video).cast('float32');
+      const prediction = await model.predict(example.expandDims());
+      const classScores = await prediction.data();
+      const maxScoreId = classScores.indexOf(Math.max(...classScores));
+      const predictedClass = CLASSES[maxScoreId];
 
-            interaction(predictedClass, classScores);
-        }, PROCESSING_SPEED);
+      interaction(predictedClass, classScores);
+    }, PROCESSING_SPEED);
+  }
+
+  // function switchCamera() {
+  //     if (currentStream) {
+  //         currentStream.getTracks().forEach(track => track.stop());
+  //     }
+  //     startVideo('user');
+  // }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    startVideo(camera_mode);
+    startPredicting();
+  });
+</script>
+</body>
+</html>
+
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+</head>
+<body>
+Make sure to run this via a server
+
+<br>
+<button id="start_stream_button">Start Video Stream</button>
+
+<br>
+<video id="video" style="width: 300px;" autoplay></video>
+<br>  <br>
+<button onclick="predict()">Predict</button>
+<br>
+<p id="result"> </p>
+
+<script>
+  const startStreamButton = document.getElementById('start_stream_button');
+  const video = document.getElementById('video');
+
+  startStreamButton.onclick = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+    } catch (error) {
+      console.error('Error accessing video stream:', error);
     }
+  };
 
-    // function switchCamera() {
-    //     if (currentStream) {
-    //         currentStream.getTracks().forEach(track => track.stop());
-    //     }
-    //     startVideo('user');
-    // }
+  async function predict() {
+    const model = await tf.loadGraphModel('./model.json');
 
-    document.addEventListener("DOMContentLoaded", function() {
-        startVideo(camera_mode);
-        startPredicting();
-    });
+    const example = tf.browser.fromPixels(video).cast('float32');
+    const expandedExample = example.expandDims(); // Expand dimensions to match model input shape
+
+    const prediction = await model.predict(expandedExample);
+    const classScores = await prediction.data();
+    const maxScoreId = classScores.indexOf(Math.max(...classScores));
+    const classes = ["Google pixel 6 pro", "Google pixel 7 pro", "iPhone 14 pro max", "iPhone XS max"];
+    const classNames = ["blue", "red", "green", "yellow"];
+
+    console.log(classScores);
+    document.getElementById("result").innerHTML = classes[maxScoreId].toString();
+
+    // Change background color based on the predicted label
+    document.body.style.backgroundColor = classNames[maxScoreId];
+  }
 </script>
 </body>
 </html>
